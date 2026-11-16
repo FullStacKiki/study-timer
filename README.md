@@ -1,5 +1,7 @@
 # Study Timer
 
+![Study Timer](docs/screenshot.jpg)
+
 Pillola-timer per macOS (design "Study Timer JP"). Overlay su tutti gli Spaces e sopra le app a schermo intero,
 segue il desktop attivo. **⇧⌘T** la mostra/nasconde. Il timer continua a girare anche quando è nascosta.
 
