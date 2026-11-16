@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap');
+@font-face { font-family: 'DelaFallback'; src: local('Hiragino Sans W8'), local('HiraginoSans-W8'), local('Hiragino Kaku Gothic StdN W8'); }
+
+/* stessi token del widget settimanale */
+:root {
+  --color-surface: #FFFFFF;  --color-accent: #E53935;  --color-accent-deep: #C62828;  --color-text: #2C2C2C;
+  --color-text-2: #767676;   --color-muted: #F5F5F5;
+  --font-ui: "Dela Gothic One", "DelaFallback", "Hiragino Kaku Gothic StdN", sans-serif;
+  --pad: 32px;                       /* margine trasparente per l'ombra (uguale a widgetPad in Swift) */
+  --radius-widget: 28px;
+  --shadow: 0 8px 24px rgba(0,0,0,0.08);
+  --shadow-hover: 0 14px 36px rgba(0,0,0,0.12);
+}
+* { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: var(--font-ui); color: var(--color-text); -webkit-font-smoothing: antialiased; }
+
+#w { position: fixed; left: var(--pad); top: var(--pad); background: var(--color-surface); border-radius: var(--radius-widget);
+  box-shadow: var(--shadow); display: flex; align-items: center; cursor: pointer; transition: box-shadow 200ms ease-out; }
+#w:hover, #w.hov { box-shadow: var(--shadow-hover); }
+#w.small  { width: 170px; height: 170px; padding: 16px; justify-content: center; }
+#w.medium { width: 364px; height: 170px; padding: 16px 18px; gap: 22px; }
+
+.lbl { font: 400 11px/1 var(--font-ui); letter-spacing: 0.1em; color: var(--color-text-2); white-space: nowrap; }
+.lbl b { font-weight: 400; color: var(--color-text); }
+
+/* anello */
+.ring { position: relative; flex: none; width: 138px; height: 138px; }
+.ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 12; }
+.ring .track { stroke: var(--color-muted); }
+.ring .prog { stroke: var(--color-accent); stroke-linecap: round; transition: stroke-dashoffset 700ms cubic-bezier(0.22, 0.8, 0.3, 1), stroke 300ms ease-out, opacity 200ms; }
+.done .ring .prog { stroke: var(--color-accent-deep); }
+.ring .mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; }
+.ring .mid .lbl { font-size: 9px; }
+.ring .mid .num { font-size: 30px; line-height: 1; color: var(--color-accent); white-space: nowrap; }
+.ring .mid .sub { font-size: 8px; letter-spacing: 0.1em; color: var(--color-text-2); white-space: nowrap; }
+.head { display: flex; align-items: center; gap: 7px; height: 11px; }
+.live { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); display: none; animation: pulse 2s ease-in-out infinite; }
+.running .live { display: block; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* taglia Medium: dettagli a destra */
+.side { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; }
+.side .pct { margin-top: 10px; font-size: 36px; line-height: 1; color: var(--color-accent); white-space: nowrap; }
+.side .rows { margin-top: auto; display: flex; flex-direction: column; gap: 7px; }
+.side .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.side .row .v { font-size: 14px; line-height: 1; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="w" class="small"></div>
+
+<script>
+const native = m => { try { window.webkit.messageHandlers.native.postMessage(m); } catch (e) {} };
+const size = new URLSearchParams(location.search).get('size') || 'small';
+const root = document.getElementById('w'); root.className = size;
+
+const R = 63, C = 2 * Math.PI * R;
+const p2 = n => String(n).padStart(2, '0');
+const hm = s => Math.floor(s / 3600) + ':' + p2(Math.floor(s % 3600 / 60));
+const goalTxt = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);        // 3H, 3H30, 1H30, 45M
+  return h && m ? `${h}H${p2(m)}` : h ? `${h}H` : `${m}M`; };
+
+let built = false, ring = null;
+function build() {
+  const svg = `<svg viewBox="0 0 138 138" width="138" height="138"><circle class="track" cx="69" cy="69" r="${R}"/>
+    <circle class="prog" cx="69" cy="69" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${C}" opacity="0"/></svg>`;
+  if (size === 'small') {
+    root.innerHTML = `<div class="ring">${svg}<div class="mid"><div class="head"><span class="lbl" id="l1">OGGI</span><i class="live"></i></div>
+      <div class="num" id="n1">0:00</div><div class="sub" id="s1"></div></div></div>`;
+  } else {
+    root.innerHTML = `<div class="ring">${svg}<div class="mid"><span class="lbl" id="l1">OGGI</span>
+      <div class="num" id="n1">0:00</div><div class="sub" id="s1"></div></div></div>
+      <div class="side"><div class="head"><span class="lbl">PROGRESSO</span><i class="live"></i></div><div class="pct" id="pct">0%</div>
+        <div class="rows"><div class="row"><span class="lbl">STUDIATO</span><span class="v" id="r1">0:00</span></div>
+        <div class="row"><span class="lbl">OBIETTIVO</span><span class="v" id="rg">3H</span></div>
+        <div class="row"><span class="lbl" id="rl2">MANCANO</span><span class="v" id="r2">0:00</span></div></div></div>`;
+  }
+  ring = root.querySelector('.prog'); built = true;
+}
+
+function update(d) {
+  if (!built) build();
+  const goal = Math.max(1, d.dailyGoal), pct = Math.min(1, d.today / goal), done = d.today >= goal;
+  root.classList.toggle('running', !!d.running);
+  root.classList.toggle('done', done);
+  ring.setAttribute('stroke-dashoffset', C * (1 - pct));
+  ring.setAttribute('opacity', d.today > 0 ? 1 : 0);
+
+  document.getElementById('n1').textContent = hm(d.today);
+  document.getElementById('s1').textContent = done ? 'COMPLETATO ✓' : 'SU ' + goalTxt(goal);
+  if (size === 'medium') {
+    document.getElementById('pct').textContent = Math.round(d.today / goal * 100) + '%';
+    document.getElementById('r1').textContent = hm(d.today);
+    document.getElementById('rg').textContent = goalTxt(goal);
+    document.getElementById('rl2').textContent = done ? 'OLTRE' : 'MANCANO';
+    document.getElementById('r2').textContent = done ? '+' + hm(d.today - goal) : hm(goal - d.today);
+  }
+}
+
+function setPointer(x, y) { root.classList.toggle('hov', x != null && root.contains(document.elementFromPoint(x, y))); }
+
+/* click = apri il popup; trascinamento = sposta il widget */
+let down = null;
+addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  down = { x: e.screenX, y: e.screenY, moved: false };
+  document.documentElement.setPointerCapture?.(e.pointerId);
+  native({ type: 'dragStart' });
+});
+addEventListener('pointermove', e => {
+  if (!down) return;
+  if (!down.moved && Math.hypot(e.screenX - down.x, e.screenY - down.y) > 4) down.moved = true;
+  if (down.moved) native({ type: 'dragMove' });
+});
+addEventListener('pointerup', () => {
+  if (!down) return;
+  native({ type: down.moved ? 'dragEnd' : 'click' });
+  down = null;
+});
+
+update({ today: 0, dailyGoal: 10800, running: false });
+</script>
+</body>
+</html>

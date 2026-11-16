@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap');
+@keyframes sgPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.78); opacity: 0.6; } }
+@keyframes sgDot   { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.55); opacity: 0.35; } }
+
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Hiragino Sans', 'M PLUS Rounded 1c', 'Helvetica Neue', sans-serif;
+  --font-num: 'SF Pro Rounded', ui-rounded, 'M PLUS Rounded 1c', -apple-system, sans-serif;
+  --pad: 32px;                       /* margine trasparente per l'ombra (uguale a widgetPad in Swift) */
+  --bg: #FFFFFF; --text: #2C2C2C; --text2: #767676; --day: #B5B5B5; --ring: #E53935; --tip-bg: #2C2C2C; --tip-fg: #FFFFFF;
+  --shadow: 0 8px 24px rgba(0,0,0,0.08);
+  --l0: #F0F0F0; --l1: #F6CFCB; --l2: #EE9A92; --l3: #DC5B50; --l4: #C0342B; --l5: #9E1F1A;
+}
+* { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+
+#w { position: fixed; left: var(--pad); top: var(--pad); border-radius: 22px; display: flex; flex-direction: column;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased; background: var(--bg); color: var(--text); box-shadow: var(--shadow); cursor: pointer; }
+#w.small  { width: 184px; height: 184px; padding: 14px; gap: 8px; }
+#w.medium { width: 480px; height: 170px; padding: 14px 18px 14px; gap: 8px; }
+#w.large  { width: 804px; height: 256px; padding: 22px 24px; gap: 14px; }
+
+.hd { display: flex; align-items: center; justify-content: space-between; height: 14px; }
+.hd span:first-child { font-size: 11px; font-weight: 600; letter-spacing: 0.01em; }
+.hd i { width: 10px; height: 10px; border-radius: 50%; background: #E53935; }
+.body { flex: 1; min-height: 0; display: flex; align-items: flex-start; gap: 24px; }
+.small .body { justify-content: center; }
+.gridwrap { display: flex; flex-direction: column; gap: 3px; flex: none; }
+.months { display: flex; gap: 3px; padding-left: 16px; height: 10px; }
+.months span { width: 11px; flex: none; overflow: visible; white-space: nowrap; font-size: 9px; line-height: 10px; color: var(--text2); }
+.cols { display: flex; gap: 4px; }
+.dl { width: 12px; display: flex; flex-direction: column; gap: 3px; }
+.dl span { height: 11px; line-height: 11px; font-size: 9px; text-align: center; color: var(--day); }
+.weeks { display: flex; gap: 3px; }
+.wk { display: flex; flex-direction: column; gap: 3px; }
+.c { position: relative; width: 11px; height: 11px; border-radius: 3px; outline-offset: 1px; }
+.c.today { outline: 1.5px solid var(--ring); }
+.c.today.live { animation: sgPulse 2s ease-in-out infinite; }
+.c.future { box-shadow: inset 0 0 0 1px var(--l0); }
+.c.gone { visibility: hidden; }
+.tip { position: absolute; bottom: 17px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 4px 8px; border-radius: 8px; font-size: 10px;
+  white-space: nowrap; pointer-events: none; background: var(--tip-bg); color: var(--tip-fg); display: none; }
+.c.hov .tip { display: block; }
+
+.rounded { font-family: var(--font-num); font-weight: 600; font-variant-numeric: tabular-nums; }
+.med { flex: 1; min-width: 0; height: 122px; display: flex; flex-direction: column; justify-content: space-between; }
+.med .s { display: flex; flex-direction: column; gap: 1px; }
+.med .l { display: flex; align-items: center; gap: 5px; height: 10px; font-size: 9px; color: var(--text2); }
+.med .v { display: flex; align-items: baseline; gap: 5px; font-size: 16px; line-height: 17px; white-space: nowrap; }
+.med .v small { font-size: 9px; font-weight: 400; color: var(--text2); }
+.med .x { font-size: 9px; color: var(--text2); white-space: nowrap; line-height: 10px; margin-top: 1px; font-variant-numeric: tabular-nums; }
+.dot { width: 5px; height: 5px; border-radius: 50%; background: #E53935; animation: sgDot 1.6s ease-in-out infinite; }
+
+.foot-s { display: flex; align-items: center; justify-content: space-between; height: 16px; }
+.foot-s > div { display: flex; align-items: baseline; gap: 4px; }
+.foot-s .rd { width: 7px; height: 7px; border-radius: 50%; background: #E53935; align-self: center; }
+.foot-s small { font-size: 9px; color: var(--text2); }
+
+.foot-l { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.stats { display: flex; gap: 34px; white-space: nowrap; }
+.stats .s { display: flex; flex-direction: column; gap: 3px; }
+.stats .l { font-size: 9px; color: var(--text2); }
+.stats .v { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.stats .v b { font-size: 18px; }
+.stats .v small { font-size: 10px; color: var(--text2); }
+.legend { display: flex; align-items: center; gap: 3px; }
+.legend small { font-size: 9px; color: var(--text2); }
+.legend small:first-child { margin-right: 3px; } .legend small:last-child { margin-left: 3px; }
+.legend i { width: 11px; height: 11px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="w" class="medium"></div>
+
+<script>
+const native = m => { try { window.webkit.messageHandlers.native.postMessage(m); } catch (e) {} };
+const size = new URLSearchParams(location.search).get('size') || 'medium';
+const root = document.getElementById('w'); root.className = size;
+
+const MON = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+const DOW = ['dom','lun','mar','mer','gio','ven','sab'];
+const p2 = n => String(n).padStart(2, '0');
+const K = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;       // stesso formato di StudyStore (yyyy-MM-dd)
+const add = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const monday = d => add(d, -((d.getDay() + 6) % 7));
+const fm = m => { if (m < 60) return `${m}m`; const h = Math.floor(m / 60), r = m % 60; return r ? `${h}h ${p2(r)}m` : `${h}h`; };
+const level = v => v <= 0 ? 0 : v < 30 ? 1 : v < 60 ? 2 : v < 120 ? 3 : v < 240 ? 4 : 5;
+
+let D = { days: {}, running: false };
+/* "oggi": quello inviato da Swift (stesso fuso e stesso giorno dei dati), altrimenti l'orologio della pagina */
+function todayDate() {
+  const m = /^(\d+)-(\d+)-(\d+)$/.exec(D.today || '');
+  const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date();
+  d.setHours(0, 0, 0, 0); return d;
+}
+const goalTxt = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);        // 3H, 3H30, 1H30, 45M
+  return h && m ? `${h}H${p2(m)}` : h ? `${h}H` : `${m}M`; };
+const minutes = d => Math.round((D.days[K(d)] || 0) / 60);
+
+function render() {
+  const today = todayDate();
+  const live = !!D.running;
+  const val = d => minutes(d);
+
+  // Intervallo mostrato. Large = anno accademico (1 set → 31 ago) che contiene oggi.
+  let lo, hi, acStart;
+  const y = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;
+  acStart = new Date(y, 8, 1);
+  if (size === 'large') { lo = acStart; hi = new Date(y + 1, 7, 31); }
+  else { const n = size === 'small' ? 8 : 22; lo = add(monday(today), -7 * (n - 1)); hi = add(monday(today), 6); }
+
+  const tT = today.getTime(), weeks = [];
+  for (let w = monday(lo); w <= hi; w = add(w, 7)) {
+    let label = '';
+    const cells = [];
+    for (let i = 0; i < 7; i++) {
+      const d = add(w, i), t = d.getTime();
+      if (t < lo.getTime() || t > hi.getTime()) { cells.push({ cls: 'gone' }); continue; }
+      if (d.getDate() === 1) label = MON[d.getMonth()];
+      if (t > tT) { cells.push({ cls: 'future' }); continue; }
+      const v = val(d), isT = K(d) === K(today);
+      cells.push({ cls: isT ? 'today' + (live ? ' live' : '') : '', bg: `var(--l${level(v)})`, k: K(d),
+                   tip: `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()].toLowerCase()} · ${v ? fm(v) : 'nessuno studio'}` });
+    }
+    weeks.push({ label, cells });
+  }
+  const firstLab = weeks.findIndex(w => w.label);
+  if (firstLab === -1 || firstLab >= 3) { const d0 = lo > monday(lo) ? lo : monday(lo); weeks[0].label = MON[d0.getMonth()]; }
+
+  // statistiche
+  const tv = val(today);
+  let week = 0; for (let d = monday(today); d <= today; d = add(d, 1)) week += val(d);
+  let streak = 0; for (let d = tv ? today : add(today, -1); val(d) > 0; d = add(d, -1)) streak++;
+  let total = 0, days = 0, studied = 0, rec = 0, recD = null, run = 0, best = 0;
+  for (let d = acStart; d <= today; d = add(d, 1)) {
+    const v = val(d); total += v; days++; if (v > 0) studied++;
+    if (v > rec) { rec = v; recD = d; }
+    run = v > 0 ? run + 1 : 0; best = Math.max(best, run);
+  }
+
+  const avgStudy = studied ? Math.round(total / studied) : 0;   // media solo sui giorni con studio
+  const grid = `<div class="gridwrap">
+    <div class="months">${weeks.map(w => `<span>${w.label}</span>`).join('')}</div>
+    <div class="cols"><div class="dl">${['月', '', '水', '', '金', '', ''].map(l => `<span>${l}</span>`).join('')}</div>
+      <div class="weeks">${weeks.map(w => `<div class="wk">${w.cells.map(c =>
+        `<div class="c ${c.cls}"${c.k ? ` data-k="${c.k}" style="background:${c.bg}"` : ''}>${c.tip ? `<span class="tip">${c.tip}</span>` : ''}</div>`).join('')}</div>`).join('')}</div>
+    </div></div>`;
+  const head = `<div class="hd"><span>Study</span><i></i></div>`;
+
+  if (size === 'small') {
+    root.innerHTML = `${head}<div class="body">${grid}</div>
+      <div class="foot-s"><div><span class="rd"></span><span class="rounded" style="font-size:15px">${streak}</span><small>giorni</small></div>
+      <div><span class="rounded" style="font-size:13px">${fm(week)}</span><small>sett.</small></div></div>`;
+  } else if (size === 'medium') {
+    const wg = D.weeklyGoal || 0, wpct = wg ? Math.round(week * 60 / wg * 100) : 0;
+    const weekExtra = wg ? `${wpct}% · ${goalTxt(wg).toLowerCase()}` : '';                      // sotto alle ore: "44% · 23H"
+    const st = [['Oggi', fm(tv), live, '', ''], ['Settimana', fm(week), false, '', weekExtra], ['Media studio', fm(avgStudy), false, '', ''], ['Streak', `${streak}`, false, 'giorni', '']];
+    root.innerHTML = `${head}<div class="body">${grid}<div class="med">${st.map(([l, v, lv, sub, extra]) =>
+      `<div class="s"><div class="l"><span>${l}</span>${lv ? '<span class="dot"></span>' : ''}</div><span class="v rounded">${v}${sub ? `<small>${sub}</small>` : ''}</span>${extra ? `<span class="x">${extra}</span>` : ''}</div>`).join('')}</div></div>`;
+  } else {
+    const st = [['Totale anno', `${Math.round(total / 60)}h`, ''], ['Media anno', fm(Math.round(total / days)), ''], ['Media studio', fm(avgStudy), `${studied} giorni`],
+                ['Giorno record', fm(rec), recD ? `${recD.getDate()} ${MON[recD.getMonth()].toLowerCase()}` : ''], ['Streak più lunga', `${best}`, 'giorni']];
+    root.innerHTML = `${head}<div class="body">${grid}</div>
+      <div class="foot-l"><div class="stats">${st.map(([l, v, s]) =>
+        `<div class="s"><span class="l">${l}</span><div class="v"><b class="rounded">${v}</b><small>${s}</small></div></div>`).join('')}</div>
+      <div class="legend"><small>meno</small>${[0, 1, 2, 3, 4, 5].map(i => `<i style="background:var(--l${i})"></i>`).join('')}<small>più</small></div></div>`;
+  }
+}
+
+
+/* Ridisegna solo se cambia qualcosa di visibile (minuti, "in corso", giorno): update() arriva ogni secondo
+   e un ridisegno farebbe sparire il tooltip mentre ci passi sopra. */
+let hovered = null, sig = '';
+function update(d) {
+  const s = (d.running ? 1 : 0) + '|' + (d.today || K(new Date())) + '|' + d.weeklyGoal + '|' + Object.keys(d.days).sort().map(k => k + ':' + Math.round(d.days[k] / 60)).join(',');
+  D = d;
+  if (s === sig) return;
+  sig = s;
+  const hk = hovered && hovered.dataset.k;
+  hovered = null; render();
+  if (hk) setHover(root.querySelector(`.c[data-k="${hk}"]`));
+}
+
+/* tooltip: tiene il suggerimento dentro la card anche per le celle ai bordi */
+function setHover(cell) {
+  if (cell === hovered) return;
+  if (hovered) { hovered.classList.remove('hov'); const t = hovered.querySelector('.tip'); if (t) t.style.marginLeft = ''; }
+  hovered = cell;
+  if (!cell) return;
+  cell.classList.add('hov');
+  const t = cell.querySelector('.tip'); if (!t) return;
+  const r = t.getBoundingClientRect(), b = root.getBoundingClientRect();
+  if (r.left < b.left + 4) t.style.marginLeft = (b.left + 4 - r.left) + 'px';
+  else if (r.right > b.right - 4) t.style.marginLeft = (b.right - 4 - r.right) + 'px';
+}
+/* puntatore inoltrato da Swift (la finestra non e' mai key: :hover di WebKit non basta) */
+function setPointer(x, y) {
+  const el = x == null ? null : document.elementFromPoint(x, y);
+  setHover(el && el.closest ? el.closest('.c[data-k]') : null);
+}
+
+/* click = apri il popup; trascinamento = sposta il widget */
+let down = null;
+addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  down = { x: e.screenX, y: e.screenY, moved: false };
+  document.documentElement.setPointerCapture?.(e.pointerId);
+  native({ type: 'dragStart' });
+});
+addEventListener('pointermove', e => {
+  if (!down) return;
+  if (!down.moved && Math.hypot(e.screenX - down.x, e.screenY - down.y) > 4) down.moved = true;
+  if (down.moved) native({ type: 'dragMove' });
+});
+addEventListener('pointerup', () => {
+  if (!down) return;
+  native({ type: down.moved ? 'dragEnd' : 'click' });
+  down = null;
+});
+
+render();
+</script>
+</body>
+</html>

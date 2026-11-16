@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap');
+@font-face { font-family: 'DelaFallback'; src: local('Hiragino Sans W8'), local('HiraginoSans-W8'), local('Hiragino Kaku Gothic StdN W8'); }
+
+/* eredita i colori e il font del popup START STUDY */
+:root {
+  --color-surface: #FFFFFF;  --color-accent: #E53935;  --color-text: #2C2C2C;
+  --color-text-2: #767676;   --color-muted: #F5F5F5;   --color-border: #E0E0E0;
+  --font-ui: "Dela Gothic One", "DelaFallback", "Hiragino Kaku Gothic StdN", sans-serif;
+  --pad: 32px;                       /* margine trasparente per l'ombra (uguale a widgetPad in Swift) */
+  --radius-widget: 28px;
+  --shadow: 0 8px 24px rgba(0,0,0,0.08);
+  --shadow-hover: 0 14px 36px rgba(0,0,0,0.12);
+}
+* { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: var(--font-ui); color: var(--color-text); -webkit-font-smoothing: antialiased; }
+
+#w { position: fixed; left: var(--pad); top: var(--pad); background: var(--color-surface); border-radius: var(--radius-widget);
+  box-shadow: var(--shadow); display: flex; flex-direction: column; cursor: pointer;
+  transition: box-shadow 200ms ease-out; }
+#w:hover, #w.hov { box-shadow: var(--shadow-hover); }
+#w.small  { width: 170px; height: 170px; padding: 16px; }
+#w.medium { width: 364px; height: 170px; padding: 16px 18px; flex-direction: row; gap: 16px; }
+#w.large  { width: 364px; height: 382px; padding: 20px; }
+
+.lbl { font: 400 11px/1 var(--font-ui); letter-spacing: 0.1em; color: var(--color-text-2); white-space: nowrap; }
+.lbl b { font-weight: 400; color: var(--color-text); }
+.num { color: var(--color-accent); line-height: 1; white-space: nowrap; }
+.small .num { font-size: 40px; }  .medium .num { font-size: 36px; }  .large .num { font-size: 52px; }
+.head { display: flex; align-items: center; gap: 7px; height: 11px; }
+.live { width: 6px; height: 6px; border-radius: 50%; background: var(--color-accent); display: none; animation: pulse 2s ease-in-out infinite; }
+.running .live { display: block; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+.prog { height: 8px; border-radius: 999px; background: var(--color-muted); overflow: hidden; }
+.large .prog { height: 10px; }
+.prog b { display: block; height: 100%; border-radius: inherit; background: var(--color-accent); transition: width 400ms ease-out; }
+
+/* taglie */
+.small .col-main { display: contents; }
+.small .num { margin-top: 12px; }
+.small .foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+.medium .left { flex: none; width: 132px; display: flex; flex-direction: column; }
+.medium .num { margin-top: 10px; }
+.medium .foot { margin-top: auto; display: flex; flex-direction: column; gap: 7px; }
+.medium .right { flex: 1; min-width: 0; display: flex; align-items: flex-end; }
+.large .num { margin-top: 12px; }
+.large .goalrow { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.large .chartwrap { margin-top: 18px; }
+.large .week { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+.large .week .top { display: flex; justify-content: space-between; }
+.large .stats { margin-top: 14px; display: flex; justify-content: space-between; }
+
+/* grafico a barre */
+.chart { width: 100%; }
+.plot { position: relative; }
+.cols { display: flex; justify-content: space-between; }
+.col { display: flex; flex-direction: column; align-items: center; }
+.area { display: flex; align-items: flex-end; }
+.bar { position: relative; background: var(--color-accent); opacity: 0.55; transition: opacity 200ms ease-out, height 400ms ease-out; }
+.bar.today { opacity: 1; }
+.bar.empty { background: var(--empty); opacity: 1; }
+.col:hover .bar:not(.empty), .col.hov .bar:not(.empty) { opacity: 1; }
+.gl { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.gl path { fill: none; stroke: var(--color-border); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.day { margin-top: 6px; font: 400 10px/1 var(--font-ui); color: var(--color-text-2); }
+.day.today { color: var(--color-accent); }
+.dot { margin-top: 4px; border-radius: 50%; background: transparent; }
+.dot.on { background: var(--color-accent); }
+.tip { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translate(-50%, 4px); padding: 5px 7px; border-radius: 8px;
+  background: var(--color-text); color: #fff; font: 400 10px/1 var(--font-ui); letter-spacing: 0.06em; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity 150ms ease-out, transform 150ms ease-out; z-index: 5; }
+.col:hover .tip, .col.hov .tip { opacity: 1; transform: translate(-50%, 0); }
+.medium { --empty: #F5F5F5; }
+.large  { --empty: #E0E0E0; }
+</style>
+</head>
+<body>
+<div id="w" class="small"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const native = m => { try { window.webkit.messageHandlers.native.postMessage(m); } catch (e) {} };
+const size = new URLSearchParams(location.search).get('size') || 'small';
+const root = $('w'); root.className = size;
+
+const DAYS = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
+const DAYS_LONG = ['LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB', 'DOM'];
+const CFG = {
+  medium: { barW: 18, area: 100, dot: 4 },
+  large:  { barW: 26, area: 116, dot: 5 },
+};
+let D = null;
+
+const p2 = n => String(n).padStart(2, '0');
+const hm = s => Math.floor(s / 3600) + ':' + p2(Math.floor(s % 3600 / 60));                 // 1:25
+const goalTxt = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);        // 3H, 3H30, 1H30, 45M
+  return h && m ? `${h}H${p2(m)}` : h ? `${h}H` : `${m}M`; };
+const pct = (v, g) => g > 0 ? Math.min(100, Math.round(v / g * 100)) : 0;
+
+/* scala verticale comune a barre e linea dell'obiettivo (che e' a gradini: un obiettivo per giorno) */
+const scaleMax = () => Math.max(Math.max(...D.weekGoals) * 1.15, ...D.week.map(v => v * 1.08), 3600);
+
+function chart(c) {
+  const max = scaleMax();
+  const h = v => Math.max(10, Math.round(v / max * c.area));
+  const cols = D.week.map((v, i) => {
+    const today = i === D.todayIdx, future = i > D.todayIdx, empty = v < 60 || future;
+    const cls = 'bar' + (empty ? ' empty' : '') + (today && !empty ? ' today' : '');
+    const tip = `<span class="tip">${DAYS_LONG[i]} · ${hm(v)}</span>`;
+    return `<div class="col" style="width:${c.barW}px">
+      <div class="area" style="height:${c.area}px"><div class="${cls}" style="width:${c.barW}px;height:${empty ? 10 : h(v)}px;border-radius:${c.barW / 2}px">${tip}</div></div>
+      <span class="day${today ? ' today' : ''}">${DAYS[i]}</span>
+      <span class="dot${today ? ' on' : ''}" style="width:${c.dot}px;height:${c.dot}px"></span></div>`;
+  }).join('');
+  return `<div class="chart"><div class="plot"><svg class="gl"><path/></svg><div class="cols">${cols}</div></div></div>`;
+}
+
+/* linea tratteggiata a gradini: ogni giorno col suo obiettivo (si misura la larghezza reale del grafico) */
+function drawGoals() {
+  const c = CFG[size], plot = root.querySelector('.plot');
+  if (!c || !plot) return;
+  const W = plot.clientWidth, max = scaleMax(), G = D.weekGoals, gap = (W - 7 * c.barW) / 6;
+  const y = g => (c.area - g / max * c.area).toFixed(1);
+  let path = `M0 ${y(G[0])}`;
+  for (let i = 0; i < 7; i++) {
+    path += ` H${(i === 6 ? W : (i + 1) * (c.barW + gap) - gap / 2).toFixed(1)}`;      // fine del segmento: meta' dello spazio tra due barre
+    if (i < 6 && G[i + 1] !== G[i]) path += ` V${y(G[i + 1])}`;                         // gradino
+  }
+  const svg = plot.querySelector('.gl');
+  svg.setAttribute('width', W); svg.setAttribute('height', plot.clientHeight);
+  svg.querySelector('path').setAttribute('d', path);
+}
+
+/* Si ridisegna solo se cambia qualcosa di visibile: update() arriva ogni secondo e un ridisegno
+   farebbe sparire il tooltip mentre ci passi sopra. Gli obiettivi fanno parte della firma, quindi un cambio li aggiorna. */
+let sig = '';
+function update(d) {
+  d.weekGoals = d.weekGoals || Array(7).fill(d.dailyGoal);
+  const s = JSON.stringify([d.running, hm(d.today), d.week.map(hm), d.todayIdx, hm(d.weekTotal), hm(d.avg), d.streak,
+                            d.dailyGoal, d.weekGoals, d.weeklyGoal, pct(d.today, d.dailyGoal), pct(d.weekTotal, d.weeklyGoal)]);
+  D = d;
+  if (s === sig) return;
+  sig = s;
+  root.classList.toggle('running', !!d.running);
+  const live = '<i class="live"></i>';
+  const dpct = pct(d.today, d.dailyGoal);
+  const label = `<span class="lbl">OGGI</span>${live}`;
+  const goalLbl = size === 'large' ? `<span class="lbl"><b>${dpct}%</b> · OBIETTIVO ${goalTxt(d.dailyGoal)}</span>` : `<span class="lbl"><b>${dpct}%</b> · ${goalTxt(d.dailyGoal)}</span>`;
+  const prog = `<div class="prog"><b style="width:${dpct}%"></b></div>`;
+
+  if (size === 'small') {
+    root.innerHTML = `<div class="head">${label}</div><div class="num">${hm(d.today)}</div>
+      <div class="foot">${prog}${goalLbl}</div>`;
+  } else if (size === 'medium') {
+    root.innerHTML = `<div class="left"><div class="head">${label}</div><div class="num">${hm(d.today)}</div>
+      <div class="foot">${prog}<span class="lbl"><b>${dpct}%</b> · ${goalTxt(d.dailyGoal)}</span></div></div>
+      <div class="right">${chart(CFG.medium)}</div>`;
+  } else {
+    const wp = pct(d.weekTotal, d.weeklyGoal);
+    root.innerHTML = `<div class="head">${label}</div><div class="num">${hm(d.today)}</div>
+      <div class="goalrow">${prog}${goalLbl}</div>
+      <div class="chartwrap">${chart(CFG.large)}</div>
+      <div class="week"><div class="top"><span class="lbl">SETTIMANA</span><span class="lbl"><b>${hm(d.weekTotal)}</b> / ${goalTxt(d.weeklyGoal)}</span></div>
+        <div class="prog"><b style="width:${wp}%"></b></div></div>
+      <div class="stats"><span class="lbl">MEDIA <b>${hm(d.avg)}</b></span><span class="lbl">SERIE <b>${d.streak} ${d.streak === 1 ? 'GIORNO' : 'GIORNI'}</b></span></div>`;
+  }
+  drawGoals();
+}
+
+/* puntatore inoltrato da Swift (la finestra non e' mai key: :hover di WebKit non basta) */
+function setPointer(x, y) {
+  const el = x == null ? null : document.elementFromPoint(x, y);
+  document.querySelectorAll('.col').forEach(c => c.classList.toggle('hov', !!el && c.contains(el)));
+  root.classList.toggle('hov', !!el && root.contains(el));
+}
+
+/* click = apri il popup; trascinamento = sposta il widget */
+let down = null;
+addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  down = { x: e.screenX, y: e.screenY, moved: false };
+  document.documentElement.setPointerCapture?.(e.pointerId);
+  native({ type: 'dragStart' });
+});
+addEventListener('pointermove', e => {
+  if (!down) return;
+  if (!down.moved && Math.hypot(e.screenX - down.x, e.screenY - down.y) > 4) down.moved = true;
+  if (down.moved) native({ type: 'dragMove' });
+});
+addEventListener('pointerup', () => {
+  if (!down) return;
+  native({ type: down.moved ? 'dragEnd' : 'click' });
+  down = null;
+});
+
+update({ today: 0, week: [0, 0, 0, 0, 0, 0, 0], todayIdx: 0, weekTotal: 0, avg: 0, streak: 0, dailyGoal: 10800, weekGoals: Array(7).fill(10800), weeklyGoal: 72000, running: false });
+</script>
+</body>
+</html>

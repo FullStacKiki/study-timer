@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap');
+/* Fallback offline: gothic pesante di macOS con la stessa resa di Dela Gothic One */
+@font-face { font-family: 'DelaFallback'; src: local('Hiragino Sans W8'), local('HiraginoSans-W8'), local('Hiragino Kaku Gothic StdN W8'); }
+
+:root {
+  --color-surface: #FFFFFF;  --color-accent: #E53935;  --color-accent-hover: #D32F2F;
+  --color-text: #2C2C2C;     --color-text-2: #767676;  --color-muted: #F5F5F5;
+  --color-border: #E0E0E0;   --color-disabled: #E0E0E0;
+
+  --font-ui: "Dela Gothic One", "DelaFallback", "Hiragino Kaku Gothic StdN", sans-serif;
+
+  --card-width: 660px;  --card-height: 150px;  --pad: 44px;   /* --pad = margine trasparente per l'ombra */
+  --radius-card: 36px;  --radius-chip: 14px;
+  --btn-size: 88px;  --dot-size: 56px;
+
+  --shadow-card: 0 8px 24px rgba(0,0,0,0.08);
+  --shadow-card-hover: 0 14px 36px rgba(0,0,0,0.12);
+  --shadow-btn: 0 4px 12px rgba(229,57,53,0.22);
+
+  --ease: ease-out;  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-open: 400ms;  --dur-hover: 200ms;  --dur-press: 300ms;
+  --dur-icon: 150ms;  --dur-label-pulse: 2s;
+  --scale-hover: 1.08;  --scale-press: 0.92;  --open-offset-y: 24px;
+}
+
+* { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
+  font-family: var(--font-ui); color: var(--color-text); -webkit-font-smoothing: antialiased; }
+
+/* #wrap ha la dimensione "naturale" della finestra e viene scalato: la finestra nativa ha la stessa scala. */
+#wrap { position: fixed; left: 0; top: 0; width: calc(var(--card-width) + var(--pad) * 2); height: calc(var(--card-height) + var(--pad) * 2);
+  transform: scale(var(--s, 1)); transform-origin: 0 0; }
+#stage { position: absolute; left: var(--pad); top: var(--pad); width: var(--card-width); height: var(--card-height); }
+
+/* maniglie di ridimensionamento: in basso a destra (ancora in alto a sinistra) e in alto a sinistra (ancora in basso a destra) */
+.grip { position: absolute; width: 20px; height: 20px; opacity: 0; cursor: nwse-resize; transition: opacity var(--dur-hover) var(--ease); }
+.grip.br { right: 9px; bottom: 9px; }
+.grip.tl { left: 9px; top: 9px; transform: rotate(180deg); }
+#card:hover .grip, #card.hov .grip, .grip.on { opacity: 0.55; }
+.grip:hover, .grip.hov, .grip.on { opacity: 1 !important; }
+.grip { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg stroke='%23767676' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M17 5L5 17M17 11L11 17'/%3E%3C/g%3E%3C/svg%3E") no-repeat center / contain; }
+
+#card {
+  position: relative; width: 100%; height: 100%;
+  display: flex; align-items: center; gap: 16px; padding: 28px 32px;
+  background: var(--color-surface); border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card); cursor: pointer;
+  opacity: 0; transform: translateY(var(--open-offset-y));
+  transition: box-shadow var(--dur-hover) var(--ease), opacity var(--dur-open) var(--ease), transform var(--dur-open) var(--ease);
+}
+#card.open { opacity: 1; transform: translateY(0); }
+#card.closing { opacity: 0; transform: translateY(12px); transition-duration: var(--dur-hover), var(--dur-hover), var(--dur-hover); }
+#card:hover, #card.hov { box-shadow: var(--shadow-card-hover); }
+#card[data-status="paused"] {
+  background: linear-gradient(90deg, var(--color-muted) var(--elapsed, 0%), var(--color-surface) var(--elapsed, 0%));
+}
+
+/* cerchio rosso */
+#dot { flex: none; width: var(--dot-size); height: var(--dot-size); border-radius: 50%; background: var(--color-accent);
+  transition: background var(--dur-hover) var(--ease); }
+#card[data-status="paused"] #dot { background: var(--color-text-2); }
+#card[data-status="finished"] #dot { background: var(--color-disabled); }
+
+/* colonna centrale: etichetta + tempo */
+#mid { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+#labels { display: flex; align-items: center; gap: 8px; height: 26px; }
+.chip {
+  font: 400 14px/1 var(--font-ui); letter-spacing: 0.1em; padding: 6px 12px; border-radius: var(--radius-chip);
+  background: var(--color-muted); color: var(--color-text); white-space: nowrap;
+  transition: background var(--dur-hover) var(--ease), color var(--dur-hover) var(--ease);
+}
+#card[data-status="running"] #label { background: var(--color-accent); color: #fff; animation: pulse var(--dur-label-pulse) ease-in-out infinite; }
+#card[data-status="paused"] #label { color: var(--color-text-2); }
+#card[data-status="finished"] #label { background: var(--color-disabled); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.sub { font-size: 13px; padding: 6px 10px; background: transparent; color: var(--color-text-2); cursor: pointer; display: none; }
+.sub:hover, .sub.hov { background: var(--color-surface); color: var(--color-text); }
+#card[data-status="paused"] .sub { display: block; }
+
+#time { display: flex; align-items: baseline; font: 400 64px/1 var(--font-ui); height: 64px; }
+#time .d { display: inline-block; width: 0.85em; text-align: center; }
+#time .c { display: inline-block; width: 0.5em; text-align: center; }
+#card[data-status="finished"] #time { color: var(--color-text-2); }
+
+/* pulsante rotondo */
+#btn {
+  position: relative; flex: none; margin-left: auto; width: var(--btn-size); height: var(--btn-size); border: 0; padding: 0;
+  border-radius: 50%; background: var(--color-accent); color: #fff; cursor: pointer; outline: none;
+  box-shadow: var(--shadow-btn);
+  transition: transform var(--dur-press) var(--spring), background var(--dur-hover) var(--ease), box-shadow var(--dur-hover) var(--ease);
+}
+#btn:hover, #btn.hov { background: var(--color-accent-hover); transform: scale(var(--scale-hover)); transition-duration: var(--dur-hover), var(--dur-hover), var(--dur-hover); }
+#btn:active, #btn.press { transform: scale(var(--scale-press)); transition-duration: 90ms, var(--dur-hover), var(--dur-hover); }
+#card[data-status="finished"] #btn { background: var(--color-disabled); color: var(--color-text-2); box-shadow: none; }
+#card[data-status="finished"] #btn:hover, #card[data-status="finished"] #btn.hov { background: #D5D5D5; }
+
+#btn svg { position: absolute; left: 50%; top: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px;
+  fill: currentColor; opacity: 0; transform: rotate(-90deg);
+  transition: opacity var(--dur-icon) var(--ease), transform var(--dur-icon) var(--ease); }
+#card[data-status="idle"] #i-play, #card[data-status="paused"] #i-play,
+#card[data-status="running"] #i-pause,
+#card[data-status="finished"] #i-reset { opacity: 1; transform: rotate(0); }
+#card[data-status="running"] #i-play { transform: rotate(90deg); }
+#btn #i-reset { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <div id="card" data-status="idle">
+    <span id="dot"></span>
+    <div id="mid">
+      <div id="labels"><span id="label" class="chip">START STUDY</span><span id="finish" class="chip sub">FINISH ✓</span><span id="sub" class="chip sub">RESET ↺</span></div>
+      <div id="time"></div>
+    </div>
+    <button id="btn" aria-label="Start">
+      <svg id="i-play" viewBox="0 0 36 36"><path d="M13 8.5v19a1 1 0 0 0 1.5.86l16-9.5a1 1 0 0 0 0-1.72l-16-9.5A1 1 0 0 0 13 8.5z"/></svg>
+      <svg id="i-pause" viewBox="0 0 36 36"><rect x="10" y="8" width="6.5" height="20" rx="2"/><rect x="19.5" y="8" width="6.5" height="20" rx="2"/></svg>
+      <svg id="i-reset" viewBox="0 0 36 36"><path d="M27 18a9 9 0 1 1-2.64-6.36"/><path d="M26.5 6.5v6h-6"/></svg>
+    </button>
+    <span class="grip tl" data-corner="tl" title="Trascina per ridimensionare (doppio click: dimensione originale)"></span>
+    <span class="grip br" data-corner="br" title="Trascina per ridimensionare (doppio click: dimensione originale)"></span>
+  </div>
+</div></div>
+
+<script>
+const LABELS = { idle: 'START STUDY', running: 'STUDYING...', paused: 'PAUSED', finished: 'COMPLETED ✓' };
+const $ = id => document.getElementById(id);
+const grips = [...document.querySelectorAll('.grip')], card = $('card'), btn = $('btn'), sub = $('sub'), fin = $('finish'), timeEl = $('time');
+const native = m => { try { window.webkit.messageHandlers.native.postMessage(m); } catch (e) {} };
+
+/* Cronometro: parte da 0 e conta in avanti. Basato su timestamp, quindi preciso anche a finestra nascosta. */
+const S = { status: 'idle', acc: 0, runStart: 0, lastTick: 0, elapsed: 0, timer: null, shown: '' };
+
+function fmt(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  const p = n => String(n).padStart(2, '0');
+  return p(h) + ':' + p(m) + ':' + p(s);
+}
+function paintTime(t) {
+  if (t === S.shown) return;
+  S.shown = t;
+  timeEl.innerHTML = [...t].map(c => c === ':' ? '<span class="c">:</span>' : '<span class="d">' + c + '</span>').join('');
+}
+function render() {
+  paintTime(fmt(S.elapsed));
+  card.dataset.status = S.status;
+  if (S.reportedStatus !== S.status) { S.reportedStatus = S.status; native({ type: 'status', status: S.status }); }
+  card.style.setProperty('--elapsed', (S.elapsed % 3600) / 36 + '%');   // sfondo grigio in pausa: avanzamento nell'ora
+  $('label').textContent = LABELS[S.status];
+  btn.setAttribute('aria-label', { idle: 'Start', running: 'Pause', paused: 'Resume', finished: 'Reset' }[S.status]);
+}
+
+function now() { return Math.floor((S.acc + (S.status === 'running' ? Date.now() - S.runStart : 0)) / 1000); }
+/* i secondi studiati vanno ai widget (StudyStore in Swift): si comunica solo l'incremento */
+function setElapsed(e) { if (e > S.elapsed) native({ type: 'study', seconds: e - S.elapsed }); S.elapsed = e; }
+/* Stop del Mac: i timer di pagina si fermano e al risveglio Date.now() salta avanti. Il controllo gira ogni
+   200 ms, quindi un intervallo > 3 s significa "sospeso": quel tempo non e' studio e si toglie dal conteggio. */
+function syncGap() {
+  const t = Date.now();
+  if (S.status === 'running' && t - S.lastTick > 3000) S.runStart += t - S.lastTick - 200;
+  S.lastTick = t;
+}
+function tick() { syncGap(); const e = now(); if (e !== S.elapsed) { setElapsed(e); render(); } }
+function start() {
+  ensureAudio();
+  S.runStart = Date.now(); S.lastTick = S.runStart; S.status = 'running';
+  clearInterval(S.timer); S.timer = setInterval(tick, 200);
+  render();
+}
+function pause() {
+  syncGap();
+  S.acc += Date.now() - S.runStart; S.status = 'paused';
+  clearInterval(S.timer); setElapsed(Math.floor(S.acc / 1000)); render();
+}
+function reset() {
+  clearInterval(S.timer);
+  S.acc = 0; S.elapsed = 0; S.status = 'idle'; render();
+}
+function finish() {
+  S.status = 'finished'; render(); chime();
+}
+function primary() {
+  if (S.status === 'idle' || S.status === 'paused') start();
+  else if (S.status === 'running') pause();
+  else reset();
+}
+
+/* ---------- suono ---------- */
+let ctx = null;
+function ensureAudio() {
+  try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); } catch (e) {}
+}
+function chime() {
+  if (S.mute) return;
+  ensureAudio(); if (!ctx) return;
+  [[880, 0], [1108.7, 0.16], [1318.5, 0.32], [1760, 0.52]].forEach(([f, at]) => {
+    const o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime + at;
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.22, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.1);
+    o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0 + 1.2);
+  });
+}
+
+/* ---------- dimensione ---------- */
+function setScale(v) { document.documentElement.style.setProperty('--s', v); }
+
+/* ---------- apertura / chiusura (chiamate da Swift) ---------- */
+function nativeOpen() {
+  card.classList.remove('closing', 'open');
+  void card.offsetWidth;                 // riavvia la transizione
+  card.classList.add('open');
+}
+function nativeClose() { card.classList.remove('open'); card.classList.add('closing'); }
+
+/* ---------- puntatore inoltrato da Swift (la finestra non e' key: :hover di WebKit non basta) ---------- */
+function inside(el, x, y) { const r = el.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }
+function setPointer(x, y) {
+  const on = x != null && inside(card, x, y);
+  card.classList.toggle('hov', on);
+  btn.classList.toggle('hov', on && inside(btn, x, y));
+  grips.forEach(g => g.classList.toggle('hov', on && inside(g, x, y)));
+  [sub, fin].forEach(el => el.classList.toggle('hov', on && getComputedStyle(el).display !== 'none' && inside(el, x, y)));
+}
+
+/* ---------- eventi ---------- */
+btn.addEventListener('click', e => { e.stopPropagation(); primary(); });
+btn.addEventListener('mousedown', () => btn.classList.add('press'));
+addEventListener('mouseup', () => btn.classList.remove('press'));
+sub.addEventListener('click', e => { e.stopPropagation(); reset(); });
+fin.addEventListener('click', e => { e.stopPropagation(); finish(); });
+
+/* trascinamento della pillola (non parte da pulsante e chip, altrimenti il capture ruberebbe i click) */
+let dragging = false;
+card.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || e.target.closest('button, .sub, .grip')) return;
+  dragging = true; card.setPointerCapture(e.pointerId); native({ type: 'dragStart' });
+});
+card.addEventListener('pointermove', () => { if (dragging) native({ type: 'dragMove' }); });
+card.addEventListener('pointerup', () => { if (dragging) { dragging = false; native({ type: 'dragEnd' }); } });
+
+/* ridimensionamento dalle maniglie: la geometria la gestisce Swift (l'angolo opposto resta fermo) */
+grips.forEach(g => {
+  let on = false;
+  g.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.stopPropagation(); on = true; g.classList.add('on'); g.setPointerCapture(e.pointerId); native({ type: 'resizeStart', corner: g.dataset.corner });
+  });
+  g.addEventListener('pointermove', () => { if (on) native({ type: 'resizeMove' }); });
+  g.addEventListener('pointerup', () => { if (on) { on = false; g.classList.remove('on'); native({ type: 'resizeEnd' }); } });
+  g.addEventListener('dblclick', () => native({ type: 'resizeReset' }));
+});
+
+/* ---------- init (parametri di prova: ?state=running&elapsed=1122&hover=1&open=1&mute=1) ---------- */
+(function init() {
+  const q = new URLSearchParams(location.search);
+  S.mute = q.get('mute') === '1';
+  const st = q.get('state'), el = parseInt(q.get('elapsed'));
+  if (!isNaN(el)) { S.acc = el * 1000; S.elapsed = el; }
+  if (st === 'running') { S.runStart = S.lastTick = Date.now(); S.status = 'running'; S.timer = setInterval(tick, 200); }
+  else if (st === 'paused') S.status = 'paused';
+  else if (st === 'finished') S.status = 'finished';
+  if (q.get('hover') === '1') { card.classList.add('hov'); btn.classList.add('hov'); }
+  render();
+  if (q.get('open') === '1') nativeOpen();
+})();
+</script>
+</body>
+</html>
